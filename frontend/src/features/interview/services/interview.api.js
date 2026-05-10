@@ -1,8 +1,7 @@
 import axios from "axios";
-
 const api = axios.create({
-    baseURL: "http://localhost:3000",
-    withCredentials: true,
+    baseURL: "https://interview-backend-tr95.onrender.com",
+    withCredentials: true
 })
 
 
@@ -26,6 +25,16 @@ export const generateInterviewReport = async ({ jobDescription, selfDescription,
 
 }
 
+
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem("token")
+
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+    }
+
+    return config
+})
 
 /**
  * @description Service to get interview report by interviewId.

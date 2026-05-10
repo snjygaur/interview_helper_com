@@ -8,24 +8,34 @@ export const useAuth = () => {
     const { user, setUser, loading, setLoading } = context
 
     // ✅ LOGIN
-    const handleLogin = async ({ email, password }) => {
-        setLoading(true)
-        try {
-            const data = await login({ email, password })
+   const handleLogin = async ({ email, password }) => {
+    setLoading(true)
 
-            if (!data || !data.user) {
-                return false
-            }
+    try {
+        const data = await login({ email, password })
 
-            setUser(data.user)
-            return true
+        console.log("LOGIN RESPONSE:", data) // 🔥 DEBUG
 
-        } catch (err) {
+        if (!data || !data.user) {
             return false
-        } finally {
-            setLoading(false)
         }
+
+        setUser(data.user)
+
+        // 🔥 TOKEN save (IMPORTANT)
+        if (data.token) {
+            localStorage.setItem("token", data.token)
+        }
+
+        return true
+
+    } catch (err) {
+        console.log("LOGIN ERROR:", err)
+        return false
+    } finally {
+        setLoading(false)
     }
+}
 
     // ✅ REGISTER
     const handleRegister = async ({ username, email, password }) => {
