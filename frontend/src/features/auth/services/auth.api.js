@@ -1,36 +1,20 @@
 import axios from "axios"
+
 const api = axios.create({
-    baseURL: "https://interview-backend-tr95.onrender.com",
+    baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000",
     withCredentials: true
-})
-
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("token")
-
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-    }
-
-    return config
-})
-
-// 🔥 TOKEN attach
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("token")
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
 })
 
 export async function register({ username, email, password }) {
     try {
         const res = await api.post("/api/auth/register", {
-            username, email, password
+            username,
+            email,
+            password
         })
         return res.data
     } catch (err) {
-        console.log("REGISTER ERROR:", err.response?.data || err.message)
+        console.error("REGISTER ERROR:", err.response?.data || err.message)
         return null
     }
 }
@@ -38,16 +22,12 @@ export async function register({ username, email, password }) {
 export async function login({ email, password }) {
     try {
         const res = await api.post("/api/auth/login", {
-            email, password
+            email,
+            password
         })
-
-        if (res.data.token) {
-            localStorage.setItem("token", res.data.token)
-        }
-
         return res.data
     } catch (err) {
-        console.log("LOGIN ERROR:", err.response?.data || err.message)
+        console.error("LOGIN ERROR:", err.response?.data || err.message)
         return null
     }
 }
@@ -62,5 +42,11 @@ export async function getMe() {
 }
 
 export async function logout() {
-    localStorage.removeItem("token")
+    try {
+        const res = await api.get("/api/auth/logout")
+        return res.data
+    } catch (err) {
+        console.error("LOGOUT ERROR:", err.response?.data || err.message)
+        return null
+    }
 }

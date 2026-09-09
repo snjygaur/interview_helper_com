@@ -1,27 +1,31 @@
 const jwt = require("jsonwebtoken")
 const userModel = require("../models/user.model")
+const tokenBlacklistModel = require("../models/blacklist.model")
 
 exports.authUser = async (req, res, next) => {
-
     try {
+        const token = req.cookies?.token
 
-        // 🔥 TOKEN GET
-        const authHeader = req.headers.authorization
-
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        if (!token) {
             return res.status(401).json({
                 message: "Unauthorized"
             })
         }
 
-        // 🔥 TOKEN EXTRACT
-        const token = authHeader.split(" ")[1]
+        if (!process.env.JWT_SECRET) {
+            throw new Error("JWT_SECRET is not configured")
+        }
 
-        // 🔥 VERIFY
+        const isBlacklisted = await tokenBlacklistModel.exists({ token })
+
+        if (isBlacklisted) {
+            return res.status(401).json({
+                message: "Session expired. Please login again."
+            })
+        }
+
         const decoded = jwt.verify(token, process.env.JWT_SECRET)
-
-        // 🔥 USER FIND
-        const user = await userModel.findById(decoded.id)
+        const user = await userModel.findById(decoded.id).select("_id username email")
 
         if (!user) {
             return res.status(401).json({
@@ -30,12 +34,9 @@ exports.authUser = async (req, res, next) => {
         }
 
         req.user = user
-
         next()
-
     } catch (err) {
-
-        console.log("AUTH ERROR:", err)
+        console.error("AUTH ERROR:", err.message)
 
         return res.status(401).json({
             message: "Unauthorized"

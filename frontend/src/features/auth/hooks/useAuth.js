@@ -3,57 +3,49 @@ import { AuthContext } from "../auth.context"
 import { login, register, logout, getMe } from "../services/auth.api"
 
 export const useAuth = () => {
-
     const context = useContext(AuthContext)
     const { user, setUser, loading, setLoading } = context
 
-    // ✅ LOGIN
-   const handleLogin = async ({ email, password }) => {
-    setLoading(true)
-
-    try {
-        const data = await login({ email, password })
-
-        console.log("LOGIN RESPONSE:", data) // 🔥 DEBUG
-
-        if (!data || !data.user) {
-            return false
-        }
-
-        setUser(data.user)
-
-        // 🔥 TOKEN save (IMPORTANT)
-        if (data.token) {
-            localStorage.setItem("token", data.token)
-        }
-
-        return true
-
-    } catch (err) {
-        console.log("LOGIN ERROR:", err)
-        return false
-    } finally {
-        setLoading(false)
-    }
-}
-
-    // ✅ REGISTER
-    const handleRegister = async ({ username, email, password }) => {
+    const handleLogin = async ({ email, password }) => {
         setLoading(true)
+
         try {
-            const data = await register({ username, email, password })
+            const data = await login({ email, password })
 
-            if (!data) return false
+            if (!data?.user) {
+                return false
+            }
 
+            setUser(data.user)
             return true
         } catch (err) {
+            console.error("LOGIN ERROR:", err)
             return false
         } finally {
             setLoading(false)
         }
     }
 
-    // ✅ LOGOUT
+    const handleRegister = async ({ username, email, password }) => {
+        setLoading(true)
+
+        try {
+            const data = await register({ username, email, password })
+
+            if (!data?.user) {
+                return false
+            }
+
+            setUser(data.user)
+            return true
+        } catch (err) {
+            console.error("REGISTER ERROR:", err)
+            return false
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const handleLogout = async () => {
         setLoading(true)
         await logout()
@@ -61,22 +53,24 @@ export const useAuth = () => {
         setLoading(false)
     }
 
-    // ✅ AUTO LOGIN (IMPORTANT FIX)
     useEffect(() => {
+        let mounted = true
+
         const init = async () => {
             const data = await getMe()
 
-            if (data && data.user) {
-                setUser(data.user)
-            } else {
-                setUser(null)
-            }
+            if (!mounted) return
 
+            setUser(data?.user || null)
             setLoading(false)
         }
 
         init()
-    }, [])
+
+        return () => {
+            mounted = false
+        }
+    }, [setLoading, setUser])
 
     return { user, loading, handleLogin, handleRegister, handleLogout }
 }
