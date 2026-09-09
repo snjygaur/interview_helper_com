@@ -32,29 +32,30 @@ function signToken(user) {
     )
 }
 
+function userResponse(user) {
+    return {
+        id: user._id,
+        username: user.username,
+        email: user.email
+    }
+}
+
 async function registerUserController(req, res) {
     const { username, email, password } = req.body
 
     if (!username || !email || !password) {
-        return res.status(400).json({
-            message: "Please provide username, email and password"
-        })
+        return res.status(400).json({ message: "Please provide username, email and password" })
     }
 
     if (password.length < 6) {
-        return res.status(400).json({
-            message: "Password must be at least 6 characters long"
-        })
+        return res.status(400).json({ message: "Password must be at least 6 characters long" })
     }
 
     const normalizedEmail = email.trim().toLowerCase()
     const normalizedUsername = username.trim()
 
     const isUserAlreadyExists = await userModel.findOne({
-        $or: [
-            { username: normalizedUsername },
-            { email: normalizedEmail }
-        ]
+        $or: [{ username: normalizedUsername }, { email: normalizedEmail }]
     })
 
     if (isUserAlreadyExists) {
@@ -64,7 +65,6 @@ async function registerUserController(req, res) {
     }
 
     const hash = await bcrypt.hash(password, 10)
-
     const user = await userModel.create({
         username: normalizedUsername,
         email: normalizedEmail,
@@ -76,11 +76,8 @@ async function registerUserController(req, res) {
 
     return res.status(201).json({
         message: "User registered successfully",
-        user: {
-            id: user._id,
-            username: user.username,
-            email: user.email
-        }
+        token,
+        user: userResponse(user)
     })
 }
 
@@ -88,25 +85,19 @@ async function loginUserController(req, res) {
     const { email, password } = req.body
 
     if (!email || !password) {
-        return res.status(400).json({
-            message: "Email and password are required"
-        })
+        return res.status(400).json({ message: "Email and password are required" })
     }
 
     const user = await userModel.findOne({ email: email.trim().toLowerCase() })
 
     if (!user) {
-        return res.status(400).json({
-            message: "Invalid email or password"
-        })
+        return res.status(400).json({ message: "Invalid email or password" })
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password)
 
     if (!isPasswordValid) {
-        return res.status(400).json({
-            message: "Invalid email or password"
-        })
+        return res.status(400).json({ message: "Invalid email or password" })
     }
 
     const token = signToken(user)
@@ -114,16 +105,13 @@ async function loginUserController(req, res) {
 
     return res.status(200).json({
         message: "User loggedIn successfully.",
-        user: {
-            id: user._id,
-            username: user.username,
-            email: user.email
-        }
+        token,
+        user: userResponse(user)
     })
 }
 
 async function logoutUserController(req, res) {
-    const token = req.cookies.token
+    const token = req.cookies?.token || (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.split(" ")[1] : null)
 
     if (token) {
         await tokenBlacklistModel.create({ token })
@@ -131,9 +119,7 @@ async function logoutUserController(req, res) {
 
     res.clearCookie("token", clearCookieOptions)
 
-    return res.status(200).json({
-        message: "User logged out successfully"
-    })
+    return res.status(200).json({ message: "User logged out successfully" })
 }
 
 async function getMeController(req, res) {
@@ -145,11 +131,7 @@ async function getMeController(req, res) {
 
     return res.status(200).json({
         message: "User details fetched successfully",
-        user: {
-            id: user._id,
-            username: user.username,
-            email: user.email
-        }
+        user: userResponse(user)
     })
 }
 
