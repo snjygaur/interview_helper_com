@@ -7,10 +7,18 @@ const interviewRoutes = require("./routes/interview.routes")
 
 const app = express()
 
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+const configuredOrigins = (process.env.FRONTEND_URL || "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean)
+
+const allowedOrigins = [
+    ...new Set([
+        ...configuredOrigins,
+        "https://interview-helper-com.vercel.app",
+        "http://localhost:5173"
+    ])
+]
 
 app.use(cors({
     origin: (origin, callback) => {
