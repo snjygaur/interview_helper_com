@@ -5,13 +5,18 @@ const api = axios.create({
     withCredentials: true
 })
 
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem("token")
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+})
+
 export async function register({ username, email, password }) {
     try {
-        const res = await api.post("/api/auth/register", {
-            username,
-            email,
-            password
-        })
+        const res = await api.post("/api/auth/register", { username, email, password })
+        if (res.data.token) localStorage.setItem("token", res.data.token)
         return res.data
     } catch (err) {
         console.error("REGISTER ERROR:", err.response?.data || err.message)
@@ -21,10 +26,8 @@ export async function register({ username, email, password }) {
 
 export async function login({ email, password }) {
     try {
-        const res = await api.post("/api/auth/login", {
-            email,
-            password
-        })
+        const res = await api.post("/api/auth/login", { email, password })
+        if (res.data.token) localStorage.setItem("token", res.data.token)
         return res.data
     } catch (err) {
         console.error("LOGIN ERROR:", err.response?.data || err.message)
@@ -44,8 +47,10 @@ export async function getMe() {
 export async function logout() {
     try {
         const res = await api.get("/api/auth/logout")
+        localStorage.removeItem("token")
         return res.data
     } catch (err) {
+        localStorage.removeItem("token")
         console.error("LOGOUT ERROR:", err.response?.data || err.message)
         return null
     }
