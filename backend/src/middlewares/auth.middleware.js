@@ -4,12 +4,15 @@ const tokenBlacklistModel = require("../models/blacklist.model")
 
 exports.authUser = async (req, res, next) => {
     try {
-        const token = req.cookies?.token
+        const cookieToken = req.cookies?.token
+        const authHeader = req.headers.authorization
+        const bearerToken = authHeader?.startsWith("Bearer ")
+            ? authHeader.split(" ")[1]
+            : null
+        const token = cookieToken || bearerToken
 
         if (!token) {
-            return res.status(401).json({
-                message: "Unauthorized"
-            })
+            return res.status(401).json({ message: "Unauthorized" })
         }
 
         if (!process.env.JWT_SECRET) {
@@ -28,18 +31,13 @@ exports.authUser = async (req, res, next) => {
         const user = await userModel.findById(decoded.id).select("_id username email")
 
         if (!user) {
-            return res.status(401).json({
-                message: "User not found"
-            })
+            return res.status(401).json({ message: "User not found" })
         }
 
         req.user = user
         next()
     } catch (err) {
         console.error("AUTH ERROR:", err.message)
-
-        return res.status(401).json({
-            message: "Unauthorized"
-        })
+        return res.status(401).json({ message: "Unauthorized" })
     }
 }
