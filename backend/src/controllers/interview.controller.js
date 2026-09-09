@@ -2,32 +2,47 @@ const pdfParse = require("pdf-parse")
 const { generateInterviewReport, generateResumePdf } = require("../services/ai.service")
 const interviewReportModel = require("../models/interviewReport.model")
 
-/**
- * @description Controller to generate interview report
- */
 async function generateInterViewReportController(req, res) {
     try {
-
+        const { selfDescription = "", jobDescription = "" } = req.body
         let resumeText = ""
 
-        if (req.file && req.file.buffer) {
-            const data = await pdfParse(req.file.buffer)
-            resumeText = data.text
+        if (!jobDescription.trim()) {
+            return res.status(400).json({
+                message: "Job description is required"
+            })
         }
 
-        const { selfDescription, jobDescription } = req.body
+        if (!req.file && !selfDescription.trim()) {
+            return res.status(400).json({
+                message: "Please upload a PDF resume or provide a self description"
+            })
+        }
 
-        const interViewReportByAi = await generateInterviewReport({
+        if (req.file) {
+            if (req.file.mimetype !== "application/pdf") {
+                return res.status(400).json({
+                    message: "Only PDF resumes are supported"
+                })
+            }
+
+            const data = await pdfParse(req.file.buffer)
+            resumeText = data.text?.trim() || ""
+        }
+
+        if (!resumeText && !selfDescription.trim()) {
+            return res.status(400).json({
+                message: "The uploaded PDF did not contain readable text. Please provide a self description"
+            })
+        }
+
+        const interviewReportByAi = await generateInterviewReport({
             resume: resumeText,
-            selfDescription,
-            jobDescription
+            selfDescription: selfDescription.trim(),
+            jobDescription: jobDescription.trim()
         })
 
-        console.log("AI RESPONSE:", interViewReportByAi)
-
-        // 🔥 FIX: normalize AI response
-
-        const technicalQuestions = (interViewReportByAi.technicalQuestions || []).map(q =>
+        const technicalQuestions = (interviewReportByAi.technicalQuestions || []).map((q) =>
             typeof q === "string"
                 ? {
                     question: q,
@@ -37,17 +52,17 @@ async function generateInterViewReportController(req, res) {
                 : q
         )
 
-        const behavioralQuestions = (interViewReportByAi.behavioralQuestions || []).map(q =>
+        const behavioralQuestions = (interviewReportByAi.behavioralQuestions || []).map((q) =>
             typeof q === "string"
                 ? {
                     question: q,
-                    answer: "Answer using STAR method",
+                    answer: "Answer using the STAR method",
                     intention: "Evaluate soft skills"
                 }
                 : q
         )
 
-        const skillGaps = (interViewReportByAi.skillGaps || []).map(s =>
+        const skillGaps = (interviewReportByAi.skillGaps || []).map((s) =>
             typeof s === "string"
                 ? {
                     skill: s,
@@ -56,7 +71,7 @@ async function generateInterViewReportController(req, res) {
                 : s
         )
 
-        const preparationPlan = (interViewReportByAi.preparationPlan || []).map((p, index) =>
+        const preparationPlan = (interviewReportByAi.preparationPlan || []).map((p, index) =>
             typeof p === "string"
                 ? {
                     day: index + 1,
@@ -68,41 +83,32 @@ async function generateInterViewReportController(req, res) {
 
         const interviewReport = await interviewReportModel.create({
             user: req.user.id,
-
-            title: interViewReportByAi.title || jobDescription?.slice(0, 50) || "Untitled Job",
-
+            title: interviewReportByAi.title || jobDescription.trim().slice(0, 50) || "Untitled Job",
             resume: resumeText,
-            selfDescription,
-            jobDescription,
-
-            matchScore: interViewReportByAi.matchScore || 50,
-
+            selfDescription: selfDescription.trim(),
+            jobDescription: jobDescription.trim(),
+            matchScore: Math.max(0, Math.min(100, Number(interviewReportByAi.matchScore) || 0)),
             technicalQuestions,
             behavioralQuestions,
             skillGaps,
             preparationPlan
         })
 
-        res.status(201).json({
+        return res.status(201).json({
             message: "Interview report generated successfully.",
             interviewReport
         })
-
     } catch (err) {
         console.error("Error generating interview report:", err)
 
-        res.status(500).json({
-            message: "Something went wrong while generating report"
+        return res.status(500).json({
+            message: err.message || "Something went wrong while generating report"
         })
     }
 }
 
-/**
- * @description Get interview report by ID
- */
 async function getInterviewReportByIdController(req, res) {
     try {
-
         const { interviewId } = req.params
 
         const interviewReport = await interviewReportModel.findOne({
@@ -116,54 +122,45 @@ async function getInterviewReportByIdController(req, res) {
             })
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             message: "Interview report fetched successfully.",
             interviewReport
         })
-
     } catch (err) {
         console.error("Error fetching report:", err)
-        res.status(500).json({
+        return res.status(500).json({
             message: "Something went wrong"
         })
     }
 }
 
-
-/**
- * @description Get all reports
- */
 async function getAllInterviewReportsController(req, res) {
     try {
-
         const interviewReports = await interviewReportModel
             .find({ user: req.user.id })
             .sort({ createdAt: -1 })
             .select("-resume -selfDescription -jobDescription -__v")
 
-        res.status(200).json({
+        return res.status(200).json({
             message: "Interview reports fetched successfully.",
             interviewReports
         })
-
     } catch (err) {
         console.error("Error fetching all reports:", err)
-        res.status(500).json({
+        return res.status(500).json({
             message: "Something went wrong"
         })
     }
 }
 
-
-/**
- * @description Generate resume PDF
- */
 async function generateResumePdfController(req, res) {
     try {
-
         const { interviewReportId } = req.params
 
-        const interviewReport = await interviewReportModel.findById(interviewReportId)
+        const interviewReport = await interviewReportModel.findOne({
+            _id: interviewReportId,
+            user: req.user.id
+        })
 
         if (!interviewReport) {
             return res.status(404).json({
@@ -172,7 +169,6 @@ async function generateResumePdfController(req, res) {
         }
 
         const { resume, jobDescription, selfDescription } = interviewReport
-
         const pdfBuffer = await generateResumePdf({
             resume,
             jobDescription,
@@ -184,11 +180,10 @@ async function generateResumePdfController(req, res) {
             "Content-Disposition": `attachment; filename=resume_${interviewReportId}.pdf`
         })
 
-        res.send(pdfBuffer)
-
+        return res.send(pdfBuffer)
     } catch (err) {
         console.error("Error generating PDF:", err)
-        res.status(500).json({
+        return res.status(500).json({
             message: "Failed to generate PDF"
         })
     }
